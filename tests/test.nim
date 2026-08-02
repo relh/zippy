@@ -83,3 +83,33 @@ for dataFormat in [dfDeflate, dfZlib, dfGzip]:
       )
     echo &"{dataFormat} all_uint8 original: {original.len} compressed: {compressed.len}"
     doAssert original == uncompressed
+
+block uncompressed_size_hint:
+  let original = readFile("tests/data/alice29.txt")
+  for dataFormat in [dfDeflate, dfZlib, dfGzip]:
+    let
+      compressed = compress(original, dataFormat = dataFormat)
+      detectedFormat = if dataFormat == dfDeflate: dfDeflate else: dfDetect
+
+    for hint in [1, original.len div 2, original.len, original.len * 2]:
+      doAssert uncompress(
+        compressed,
+        dataFormat = detectedFormat,
+        uncompressedSizeHint = hint
+      ) == original
+
+    let compressedBytes = cast[seq[uint8]](compressed)
+    doAssert uncompress(
+      compressedBytes,
+      dataFormat = detectedFormat,
+      uncompressedSizeHint = original.len
+    ) == cast[seq[uint8]](original)
+    doAssert uncompress(
+      compressed.cstring,
+      compressed.len,
+      dataFormat = detectedFormat,
+      uncompressedSizeHint = original.len
+    ) == original
+
+  doAssertRaises ZippyError:
+    discard uncompress("compressed", uncompressedSizeHint = -1)

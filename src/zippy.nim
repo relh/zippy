@@ -100,10 +100,22 @@ proc compress*(
 proc uncompress*(
   src: pointer,
   len: int,
-  dataFormat = dfDetect
+  dataFormat = dfDetect,
+  uncompressedSizeHint = 0
 ): string {.raises: [ZippyError].} =
   ## Uncompresses src and returns the uncompressed data.
+  ##
+  ## A positive uncompressedSizeHint preallocates the output buffer. The hint
+  ## does not limit or validate the actual uncompressed size.
   let src = cast[ptr UncheckedArray[uint8]](src)
+
+  if uncompressedSizeHint < 0 or uncompressedSizeHint > high(int) - 16:
+    raise newException(ZippyError, "Invalid uncompressed size hint")
+
+  template preallocateOutput() =
+    if uncompressedSizeHint > 0:
+      # Inflate's wide copies may write up to 16 bytes past the logical output.
+      result.setLen(uncompressedSizeHint + 16)
 
   case dataFormat:
   of dfDetect:
@@ -112,7 +124,7 @@ proc uncompress*(
       src[0].uint8 == 31 and src[1].uint8 == 139 and src[2].uint8 == 8 and
       (src[3].uint8 and 0b11100000) == 0
     ):
-      return uncompress(src, len, dfGzip)
+      return uncompress(src, len, dfGzip, uncompressedSizeHint)
 
     if (
       len > 6 and
@@ -120,14 +132,16 @@ proc uncompress*(
       (src[0].uint8 shr 4) <= 7 and
       ((src[0].uint16 * 256) + src[1].uint8) mod 31 == 0
     ):
-      return uncompress(src, len, dfZlib)
+      return uncompress(src, len, dfZlib, uncompressedSizeHint)
 
     raise newException(ZippyError, "Unable to detect compressed data format")
 
   of dfGzip:
+    preallocateOutput()
     uncompressGzip(result, src, len)
 
   of dfZlib:
+    preallocateOutput()
     if len < 6:
       failUncompress()
 
@@ -162,16 +176,21 @@ proc uncompress*(
       raise newException(ZippyError, "Checksum verification failed")
 
   of dfDeflate:
+    preallocateOutput()
     inflate(result, src, len, 0)
 
 proc uncompress*(
   src: string,
-  dataFormat = dfDetect
+  dataFormat = dfDetect,
+  uncompressedSizeHint = 0
 ): string {.raises: [ZippyError].} =
-  uncompress(src.cstring, src.len, dataFormat)
+  uncompress(src.cstring, src.len, dataFormat, uncompressedSizeHint)
 
 proc uncompress*(
   src: seq[uint8],
-  dataFormat = dfDetect
+  dataFormat = dfDetect,
+  uncompressedSizeHint = 0
 ): seq[uint8] {.raises: [ZippyError].} =
-  cast[seq[uint8]](uncompress(cast[string](src).cstring, src.len, dataFormat))
+  cast[seq[uint8]](uncompress(
+    cast[string](src).cstring, src.len, dataFormat, uncompressedSizeHint
+  ))
