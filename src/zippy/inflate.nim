@@ -108,15 +108,7 @@ proc reserveOutput(dst: var string, position, count, limit: int) {.inline.} =
   # Match copies may write up to 13 bytes past their logical end.
   let required = position + count + 13
   if required > dst.len:
-    let maximum = limit + 13
-    var capacity = min(max(dst.len, 16), maximum)
-    while capacity < required:
-      capacity =
-        if capacity > maximum div 2:
-          maximum
-        else:
-          capacity * 2
-    dst.setLen(capacity)
+    dst.setLen(max(required, min(dst.len, (limit + 13) div 2) * 2))
 
 proc inflateBlock(
   dst: var string,
