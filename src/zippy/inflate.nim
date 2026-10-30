@@ -276,7 +276,10 @@ proc inflateNoCompression(
   op += len
 
 proc inflate*(
-  dst: var string, src: ptr UncheckedArray[uint8], len, pos: int,
+  dst: var string,
+  src: ptr UncheckedArray[uint8],
+  len: int,
+  pos: int,
   maxOutputLen = int.high - 16
 ) =
   ## Bounds actual output, including streams whose declared sizes are incorrect.

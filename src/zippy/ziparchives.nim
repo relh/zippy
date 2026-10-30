@@ -90,7 +90,13 @@ proc extractFile*(
         result.setLen(record.compressedSize)
         copyMem(result[0].addr, src[pos].addr, record.compressedSize)
     elif compressionMethod == 8: # Deflate
-      inflate(result, cast[ptr UncheckedArray[uint8]](src[pos].addr), record.compressedSize, 0, maxOutputLen)
+      inflate(
+        result,
+        cast[ptr UncheckedArray[uint8]](src[pos].addr),
+        record.compressedSize,
+        0,
+        maxOutputLen
+      )
     else:
       raise newException(ZippyError, "Unsupported archive, compression method")
   of DirectoryRecord:
